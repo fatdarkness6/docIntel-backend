@@ -41,7 +41,7 @@ def tokenize(text: str) -> set[str]:
 def find_relevant_chunks(
     chunks: list[str],
     question: str,
-    limit: int = 3
+    limit: int = 2
 ) -> list[str]:
 
     question_words = tokenize(

@@ -529,6 +529,10 @@ def ask_document(
             detail="Document contains no extracted text",
         )
 
+    # -------------------------------------------------
+    # Conversation history
+    # -------------------------------------------------
+
     previous_questions = db.execute(
         select(DocumentQuestion)
         .where(
@@ -538,7 +542,7 @@ def ask_document(
         .order_by(
             DocumentQuestion.created_at.desc()
         )
-        .limit(3)
+        .limit(2)
     ).scalars().all()
 
     previous_questions.reverse()
@@ -551,37 +555,135 @@ def ask_document(
         for item in previous_questions
     ]
 
+    # -------------------------------------------------
+    # Build retrieval query
+    # -------------------------------------------------
+
+    retrieval_query = data.question
+
+    if previous_questions:
+        previous_question = previous_questions[-1].question
+        normalized_question = data.question.lower().strip()
+
+        follow_up_phrases = (
+            "shorter",
+            "briefly",
+            "one line",
+            "more concise",
+            "make it",
+            "explain it",
+            "tell me more",
+            "what about it",
+        )
+
+        follow_up_words = {
+            "it",
+            "this",
+            "that",
+        }
+
+        question_words = set(
+            normalized_question
+            .replace("?", "")
+            .replace(".", "")
+            .replace(",", "")
+            .split()
+        )
+
+        is_follow_up = (
+            any(
+                phrase in normalized_question
+                for phrase in follow_up_phrases
+            )
+            or bool(
+                question_words & follow_up_words
+            )
+        )
+
+        if is_follow_up:
+            retrieval_query = (
+                f"{previous_question}\n"
+                f"{data.question}"
+            )
+
+    # -------------------------------------------------
+    # Create question embedding
+    # -------------------------------------------------
+
     question_embedding = create_embeddings(
-        [data.question]
+        [retrieval_query]
     )[0]
 
-    relevant_chunks = db.execute(
-        select(DocumentChunk)
+    # -------------------------------------------------
+    # Semantic retrieval
+    # -------------------------------------------------
+
+    distance = DocumentChunk.embedding.cosine_distance(
+        question_embedding
+    ).label("distance")
+
+    candidate_rows = db.execute(
+        select(
+            DocumentChunk,
+            distance,
+        )
         .where(
             DocumentChunk.document_id == document.id,
             DocumentChunk.embedding.is_not(None),
         )
-        .order_by(
-            DocumentChunk.embedding.cosine_distance(
-                question_embedding
-            )
+        .order_by(distance)
+        .limit(5)
+    ).all()
+
+    if not candidate_rows:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No searchable chunks found",
         )
-        .limit(3)
-    ).scalars().all()
+
+    # -------------------------------------------------
+    # Remove weak / unrelated sources
+    # -------------------------------------------------
+
+    best_distance = float(
+        candidate_rows[0][1]
+    )
+
+    MAX_DISTANCE_GAP = 0.08
+
+    filtered_rows = [
+        (chunk, float(chunk_distance))
+        for chunk, chunk_distance in candidate_rows
+        if float(chunk_distance)
+        <= best_distance + MAX_DISTANCE_GAP
+    ]
+
+    filtered_rows = filtered_rows[:3]
+
+    relevant_chunks = [
+        chunk
+        for chunk, _
+        in filtered_rows
+    ]
+
+    if not relevant_chunks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No relevant document content found",
+        )
+
+    # -------------------------------------------------
+    # Prepare AI context
+    # -------------------------------------------------
 
     chunk_contents = [
         {
             "chunk_index": chunk.chunk_index,
             "content": chunk.content,
+            "page_number": chunk.page_number,
         }
         for chunk in relevant_chunks
     ]
-
-    if not chunk_contents:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No searchable chunks found",
-        )
 
     answer = ask_document_question(
         chunk_contents,
@@ -589,25 +691,34 @@ def ask_document(
         history,
     )
 
-    question_record = DocumentQuestion(
-        document_id=document.id,
-        user_id=current_user.id,
-        question=data.question,
-        answer=answer,
-    )
-
-    db.add(question_record)
-    db.commit()
+    # -------------------------------------------------
+    # Sources
+    # -------------------------------------------------
 
     sources = [
         {
             "chunk_id": chunk.id,
             "chunk_index": chunk.chunk_index,
             "page_number": chunk.page_number,
-            "preview": chunk.content[:300],
+            "preview": chunk.content[:200],
         }
         for chunk in relevant_chunks
     ]
+
+    # -------------------------------------------------
+    # Save conversation
+    # -------------------------------------------------
+
+    question_record = DocumentQuestion(
+        document_id=document.id,
+        user_id=current_user.id,
+        question=data.question,
+        answer=answer,
+        sources=sources,
+    )
+
+    db.add(question_record)
+    db.commit()
 
     return {
         "answer": answer,

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.session import Base
 
@@ -15,8 +16,8 @@ class DocumentQuestion(Base):
 
     document_id: Mapped[int] = mapped_column(
         ForeignKey(
-        "documents.id",
-        ondelete="CASCADE"
+            "documents.id",
+            ondelete="CASCADE"
         )
     )
 
@@ -30,6 +31,11 @@ class DocumentQuestion(Base):
 
     answer: Mapped[str] = mapped_column(
         Text
+    )
+
+    sources: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(

@@ -156,7 +156,11 @@ def ask_document_question(
 ) -> str:
 
     document_context = "\n\n---\n\n".join(
-        f"[Chunk {chunk['chunk_index']}]\n{chunk['content']}"
+        (
+            f"[Chunk {chunk['chunk_index']}]\n"
+            f"Page: {chunk['page_number']}\n"
+            f"{chunk['content']}"
+        )
         for chunk in relevant_chunks
     )
 
@@ -182,18 +186,60 @@ def ask_document_question(
         model="gpt-5-nano",
 
         instructions=f"""
-        Answer using ONLY the provided document context.
+            You are a document assistant.
 
-        Use previous conversation only to understand
-        what the user is referring to.
+            Answer using ONLY the provided document context.
 
-        If the answer isn't available in the provided context,
-        say that you couldn't find it.
+            Use previous conversation only to understand
+            what the user is referring to.
 
-        Document context:
+            If the answer is not available in the provided context,
+            say:
 
-        {document_context}
-        """,
+            "I couldn't find that information in this document."
+
+            Response style:
+
+            - Answer directly.
+            - Prefer short paragraphs with blank lines between them.
+            - Use bullet points only when they genuinely improve readability.
+            - Do not repeat information.
+            - Do not repeat the user's question.
+            - Do not add unnecessary introductions or conclusions.
+            - Never end with offers such as "If you'd like, I can..."
+            - Follow the user's requested length very strictly.
+
+            Length rules:
+
+            - If the user says "one line":
+            answer in exactly one short sentence.
+
+            - If the user says "briefly", "short", "shorter",
+            "as short as possible", or similar:
+            answer in 1-2 short sentences maximum.
+
+            - For a normal question:
+            answer in roughly 2-5 short sentences.
+
+            - If the user explicitly asks for details:
+            give a fuller answer, but keep it well structured
+            with short paragraphs and useful bullet points.
+            
+            IMPORTANT:
+            Previous assistant answers are NOT evidence.
+            Any factual claim in your answer must be supported
+            by the current document context.
+
+            When mentioning page numbers, use ONLY the explicit
+            "Page:" metadata provided with each chunk.
+
+            Do not infer page numbers from section numbers,
+            headings, or text inside the document.
+
+            Document context:
+
+            {document_context}
+            """,
 
         input=messages
     )

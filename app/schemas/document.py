@@ -39,6 +39,7 @@ class QuestionHistoryResponse(BaseModel):
     id: int
     question: str
     answer: str
+    sources: list[CitationResponse] | None = None
     created_at: datetime
 
     model_config = {
