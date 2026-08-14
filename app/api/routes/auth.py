@@ -5,7 +5,12 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse ,  UserLogin, TokenResponse
+from app.schemas.user import (
+    UserCreate,
+    UserResponse,
+    TokenResponse,
+    ChangePasswordRequest,
+)
 from app.core.security import hash_password , verify_password, create_access_token
 from app.api.dependencies import get_current_user
 
@@ -84,3 +89,43 @@ def get_me(
     current_user: User = Depends(get_current_user)
 ):
     return current_user
+
+
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_200_OK
+)
+def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not verify_password(
+        data.current_password,
+        current_user.password_hash
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+
+    if verify_password(
+        data.new_password,
+        current_user.password_hash
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+
+    current_user.password_hash = hash_password(
+        data.new_password
+    )
+
+    db.commit()
+
+    return {
+        "message": "Password changed successfully"
+    }
