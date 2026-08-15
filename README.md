@@ -21,7 +21,7 @@ The API is user-scoped: documents, folders, tags, questions, reports, and live s
 
 ## Architecture
 
-~~~mermaid
+```mermaid
 flowchart LR
     Client["Frontend client"] -->|"Bearer JWT"| API["FastAPI /api/v1"]
     API --> DB[("PostgreSQL + pgvector")]
@@ -33,35 +33,35 @@ flowchart LR
     Tasks --> Events["Durable status event log"]
     Events --> DB
     DB -->|"SSE status stream"| Client
-~~~
+```
 
 Document processing follows this lifecycle:
 
-| Stage | Progress | Description |
-|---|---:|---|
-| `queued` | 0% | The document is waiting for background processing |
-| `extracting` | 15% | Text or spreadsheet content is being extracted |
-| `chunking` | 40% | Extracted content is being split into sections |
-| `analyzing` | 60% | Embeddings are being generated |
-| `generating_summary` | 85% | The AI summary is being created |
-| `completed` | 100% | Processing finished successfully |
-| `failed` | — | Processing failed; only a safe public message is exposed |
+| Stage                | Progress | Description                                              |
+| -------------------- | -------: | -------------------------------------------------------- |
+| `queued`             |       0% | The document is waiting for background processing        |
+| `extracting`         |      15% | Text or spreadsheet content is being extracted           |
+| `chunking`           |      40% | Extracted content is being split into sections           |
+| `analyzing`          |      60% | Embeddings are being generated                           |
+| `generating_summary` |      85% | The AI summary is being created                          |
+| `completed`          |     100% | Processing finished successfully                         |
+| `failed`             |        — | Processing failed; only a safe public message is exposed |
 
 Every state transition updates the document's latest status and appends a durable event to PostgreSQL. SSE subscribers therefore work across multiple API or processing workers without relying on a process-local queue.
 
 ## Tech stack
 
-| Area | Technology |
-|---|---|
-| API | FastAPI, Uvicorn, Pydantic |
-| Authentication | OAuth2 password flow, JWT, pwdlib password hashing |
-| Database | PostgreSQL, SQLAlchemy 2, Alembic |
-| Vector search | pgvector, cosine distance |
-| AI | OpenAI Responses API and Embeddings API |
-| Processing | pypdf, python-docx, pandas, openpyxl |
-| Reports | ReportLab |
-| Realtime status | Server-Sent Events with FastAPI `StreamingResponse` |
-| Tests | Python `unittest`, FastAPI `TestClient`, isolated SQLite |
+| Area            | Technology                                               |
+| --------------- | -------------------------------------------------------- |
+| API             | FastAPI, Uvicorn, Pydantic                               |
+| Authentication  | OAuth2 password flow, JWT, pwdlib password hashing       |
+| Database        | PostgreSQL, SQLAlchemy 2, Alembic                        |
+| Vector search   | pgvector, cosine distance                                |
+| AI              | OpenAI Responses API and Embeddings API                  |
+| Processing      | pypdf, python-docx, pandas, openpyxl                     |
+| Reports         | ReportLab                                                |
+| Realtime status | Server-Sent Events with FastAPI `StreamingResponse`      |
+| Tests           | Python `unittest`, FastAPI `TestClient`, isolated SQLite |
 
 The application currently uses:
 
@@ -70,7 +70,7 @@ The application currently uses:
 
 ## Project structure
 
-~~~text
+```text
 app/
 ├── api/
 │   ├── dependencies.py
@@ -108,7 +108,7 @@ migrations/
 tests/
 uploads/
 reports/
-~~~
+```
 
 Route functions handle HTTP concerns, while focused services own extraction, chunking, AI calls, embeddings, analytics, report generation, and status streaming.
 
@@ -123,48 +123,48 @@ Route functions handle HTTP concerns, while focused services own extraction, chu
 
 ### 1. Clone and enter the project
 
-~~~bash
+```bash
 git clone https://github.com/fatdarkness6/document-intelligence-backend.git
 cd document-intelligence-backend
-~~~
+```
 
 ### 2. Create and activate a virtual environment
 
 Windows PowerShell:
 
-~~~powershell
+```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-~~~
+```
 
 macOS or Linux:
 
-~~~bash
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
-~~~
+```
 
 ### 3. Install dependencies
 
-~~~bash
+```bash
 python -m pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pgvector openai pydantic-settings pyjwt "pwdlib[argon2]" python-multipart email-validator pypdf python-docx pandas openpyxl reportlab httpx
-~~~
+```
 
 ### 4. Create the PostgreSQL database
 
 Create a database, connect to it, and enable pgvector:
 
-~~~sql
+```sql
 CREATE DATABASE document_intelligence;
 \c document_intelligence
 CREATE EXTENSION IF NOT EXISTS vector;
-~~~
+```
 
 ### 5. Configure environment variables
 
 Copy `.env.example` to `.env` and provide real values:
 
-~~~env
+```env
 DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/document_intelligence
 JWT_SECRET_KEY=replace-with-a-long-random-secret
 JWT_ALGORITHM=HS256
@@ -175,33 +175,33 @@ FRONTEND_URL=http://localhost:3000
 SSE_POLL_INTERVAL_SECONDS=1
 SSE_HEARTBEAT_INTERVAL_SECONDS=20
 SSE_MAX_CONNECTION_SECONDS=1800
-~~~
+```
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | SQLAlchemy PostgreSQL connection URL |
-| `JWT_SECRET_KEY` | Secret used to sign access tokens |
-| `JWT_ALGORITHM` | JWT signing algorithm; defaults to `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access-token lifetime; defaults to 30 minutes |
-| `OPENAI_API_KEY` | OpenAI API credential |
-| `FRONTEND_URL` | The origin allowed by CORS |
-| `SSE_POLL_INTERVAL_SECONDS` | Delay between durable event-log checks |
-| `SSE_HEARTBEAT_INTERVAL_SECONDS` | Interval between SSE heartbeat events |
-| `SSE_MAX_CONNECTION_SECONDS` | Maximum lifetime of one SSE connection |
+| Variable                         | Purpose                                       |
+| -------------------------------- | --------------------------------------------- |
+| `DATABASE_URL`                   | SQLAlchemy PostgreSQL connection URL          |
+| `JWT_SECRET_KEY`                 | Secret used to sign access tokens             |
+| `JWT_ALGORITHM`                  | JWT signing algorithm; defaults to `HS256`    |
+| `ACCESS_TOKEN_EXPIRE_MINUTES`    | Access-token lifetime; defaults to 30 minutes |
+| `OPENAI_API_KEY`                 | OpenAI API credential                         |
+| `FRONTEND_URL`                   | The origin allowed by CORS                    |
+| `SSE_POLL_INTERVAL_SECONDS`      | Delay between durable event-log checks        |
+| `SSE_HEARTBEAT_INTERVAL_SECONDS` | Interval between SSE heartbeat events         |
+| `SSE_MAX_CONNECTION_SECONDS`     | Maximum lifetime of one SSE connection        |
 
 Do not commit the real `.env` file.
 
 ### 6. Apply migrations
 
-~~~bash
+```bash
 alembic upgrade head
-~~~
+```
 
 ### 7. Start the API
 
-~~~bash
+```bash
 uvicorn app.main:app --reload
-~~~
+```
 
 The local API is available at:
 
@@ -214,34 +214,34 @@ The local API is available at:
 
 All document, folder, and tag operations require:
 
-~~~http
+```http
 Authorization: Bearer <access-token>
-~~~
+```
 
 Register:
 
-~~~bash
+```bash
 curl -X POST http://127.0.0.1:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"user@example.com\",\"password\":\"strong-password\"}"
-~~~
+```
 
 Login uses OAuth2 form data. Send the email in the `username` field:
 
-~~~bash
+```bash
 curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=user@example.com&password=strong-password"
-~~~
+```
 
 Example response:
 
-~~~json
+```json
 {
   "access_token": "<jwt>",
   "token_type": "bearer"
 }
-~~~
+```
 
 Tokens must be sent in the authorization header. Do not place access tokens in query strings.
 
@@ -249,21 +249,21 @@ Tokens must be sent in the authorization header. Do not place access tokens in q
 
 Upload a supported file as multipart form data:
 
-~~~bash
+```bash
 curl -X POST http://127.0.0.1:8000/api/v1/documents/upload \
   -H "Authorization: Bearer <access-token>" \
   -F "file=@example.pdf"
-~~~
+```
 
 Supported formats:
 
-| Extension | Processing |
-|---|---|
-| `.pdf` | Text extraction with page-aware chunks and citations |
-| `.docx` | Paragraph text extraction |
-| `.txt` | UTF-8 text extraction with invalid binary-content checks |
-| `.csv` | pandas loading, text conversion, and spreadsheet analysis |
-| `.xlsx` | Workbook validation, pandas loading, and spreadsheet analysis |
+| Extension | Processing                                                    |
+| --------- | ------------------------------------------------------------- |
+| `.pdf`    | Text extraction with page-aware chunks and citations          |
+| `.docx`   | Paragraph text extraction                                     |
+| `.txt`    | UTF-8 text extraction with invalid binary-content checks      |
+| `.csv`    | pandas loading, text conversion, and spreadsheet analysis     |
+| `.xlsx`   | Workbook validation, pandas loading, and spreadsheet analysis |
 
 Uploads are validated by extension and file structure or content. Files larger than 20 MB are rejected. The upload request creates the document with a `processing` status and schedules background work.
 
@@ -280,45 +280,45 @@ The existing `GET /api/v1/documents/{document_id}` endpoint exposes the latest s
 
 Subscribe at:
 
-~~~http
+```http
 GET /api/v1/documents/{document_id}/events
 Authorization: Bearer <access-token>
 Accept: text/event-stream
-~~~
+```
 
 The endpoint verifies authentication and ownership before opening the stream. Unknown documents and documents owned by another user both return `404` to avoid leaking resource existence. Missing or invalid authentication returns `401`.
 
 Response headers include:
 
-~~~http
+```http
 Content-Type: text/event-stream
 Cache-Control: no-cache
 Connection: keep-alive
 X-Accel-Buffering: no
-~~~
+```
 
 The server immediately sends the latest database state. Processing updates then arrive with increasing per-document event IDs:
 
-~~~text
+```text
 event: status
 id: 3
 data: {"document_id":123,"status":"processing","stage":"analyzing","progress":60,"message":"Analyzing document content","updated_at":"2026-08-15T10:30:00Z"}
-~~~
+```
 
 Available event names:
 
-| Event | Behavior |
-|---|---|
-| `status` | Queued or in-progress update |
-| `completed` | Final success update; the connection closes |
-| `failed` | Safe final failure update; the connection closes |
-| `ping` | Heartbeat while processing continues |
+| Event       | Behavior                                         |
+| ----------- | ------------------------------------------------ |
+| `status`    | Queued or in-progress update                     |
+| `completed` | Final success update; the connection closes      |
+| `failed`    | Safe final failure update; the connection closes |
+| `ping`      | Heartbeat while processing continues             |
 
 Clients may reconnect with the `Last-Event-ID` header. The latest durable snapshot is always sent first, so clients can compare event IDs and deduplicate an already handled event. A connection closes on a terminal event, client disconnection, or the configured maximum duration.
 
 Native `EventSource` cannot attach an authorization header. A fetch-based client can:
 
-~~~js
+```js
 async function watchDocument(documentId, token, lastEventId) {
   const headers = {
     Authorization: "Bearer " + token,
@@ -329,18 +329,15 @@ async function watchDocument(documentId, token, lastEventId) {
     headers["Last-Event-ID"] = String(lastEventId);
   }
 
-  const response = await fetch(
-    "/api/v1/documents/" + documentId + "/events",
-    { headers }
-  );
+  const response = await fetch("/api/v1/documents/" + documentId + "/events", {
+    headers,
+  });
 
   if (!response.ok || !response.body) {
     throw new Error("SSE subscription failed: " + response.status);
   }
 
-  const reader = response.body
-    .pipeThrough(new TextDecoderStream())
-    .getReader();
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
   let buffer = "";
 
@@ -358,8 +355,9 @@ async function watchDocument(documentId, token, lastEventId) {
       for (const line of frame.split("\n")) {
         const separator = line.indexOf(":");
         if (separator === -1) continue;
-        fields[line.slice(0, separator)] =
-          line.slice(separator + 1).trimStart();
+        fields[line.slice(0, separator)] = line
+          .slice(separator + 1)
+          .trimStart();
       }
 
       const data = JSON.parse(fields.data);
@@ -374,7 +372,7 @@ async function watchDocument(documentId, token, lastEventId) {
     }
   }
 }
-~~~
+```
 
 If SSE cannot be established, fetch the document detail endpoint once as a fallback rather than continuously polling it.
 
@@ -382,12 +380,12 @@ If SSE cannot be established, fetch the document detail endpoint once as a fallb
 
 Questions can be asked only after processing completes:
 
-~~~bash
+```bash
 curl -X POST http://127.0.0.1:8000/api/v1/documents/123/ask \
   -H "Authorization: Bearer <access-token>" \
   -H "Content-Type: application/json" \
   -d "{\"question\":\"What are the main conclusions?\"}"
-~~~
+```
 
 The RAG flow:
 
@@ -419,78 +417,78 @@ All routes use the `/api/v1` prefix.
 
 ### Health
 
-| Method | Endpoint | Authentication | Description |
-|---|---|---|---|
-| GET | `/health` | No | Application health |
-| GET | `/health/database` | No | Database connectivity |
+| Method | Endpoint           | Authentication | Description           |
+| ------ | ------------------ | -------------- | --------------------- |
+| GET    | `/health`          | No             | Application health    |
+| GET    | `/health/database` | No             | Database connectivity |
 
 ### Authentication
 
-| Method | Endpoint | Authentication | Description |
-|---|---|---|---|
-| POST | `/auth/register` | No | Register a user |
-| POST | `/auth/login` | No | Obtain a bearer access token |
-| GET | `/auth/me` | Bearer | Get the current user |
-| POST | `/auth/change-password` | Bearer | Change the current password |
+| Method | Endpoint                | Authentication | Description                  |
+| ------ | ----------------------- | -------------- | ---------------------------- |
+| POST   | `/auth/register`        | No             | Register a user              |
+| POST   | `/auth/login`           | No             | Obtain a bearer access token |
+| GET    | `/auth/me`              | Bearer         | Get the current user         |
+| POST   | `/auth/change-password` | Bearer         | Change the current password  |
 
 ### Documents and AI
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/documents/upload` | Upload and queue a document |
-| GET | `/documents` | List and filter the user's documents |
-| GET | `/documents/stats` | Get dashboard statistics |
-| GET | `/documents/{document_id}` | Get document details and latest status |
-| PATCH | `/documents/{document_id}` | Rename a document |
-| DELETE | `/documents/{document_id}` | Delete a document and related resources |
-| GET | `/documents/{document_id}/events` | Stream processing status with SSE |
-| POST | `/documents/{document_id}/reprocess` | Reprocess the original upload |
-| POST | `/documents/{document_id}/ask` | Ask a grounded document question |
-| GET | `/documents/{document_id}/questions` | Get question history |
-| GET | `/documents/{document_id}/analysis` | Analyze a CSV or XLSX document |
-| GET | `/documents/{document_id}/insights` | Get or create cached spreadsheet insights |
-| GET | `/documents/{document_id}/report` | Download a generated PDF report |
-| PATCH | `/documents/{document_id}/favorite` | Set favorite status |
-| PATCH | `/documents/{document_id}/folder` | Move into or out of a folder |
-| POST | `/documents/{document_id}/tags` | Attach a tag |
-| DELETE | `/documents/{document_id}/tags/{tag_id}` | Remove a tag |
+| Method | Endpoint                                 | Description                               |
+| ------ | ---------------------------------------- | ----------------------------------------- |
+| POST   | `/documents/upload`                      | Upload and queue a document               |
+| GET    | `/documents`                             | List and filter the user's documents      |
+| GET    | `/documents/stats`                       | Get dashboard statistics                  |
+| GET    | `/documents/{document_id}`               | Get document details and latest status    |
+| PATCH  | `/documents/{document_id}`               | Rename a document                         |
+| DELETE | `/documents/{document_id}`               | Delete a document and related resources   |
+| GET    | `/documents/{document_id}/events`        | Stream processing status with SSE         |
+| POST   | `/documents/{document_id}/reprocess`     | Reprocess the original upload             |
+| POST   | `/documents/{document_id}/ask`           | Ask a grounded document question          |
+| GET    | `/documents/{document_id}/questions`     | Get question history                      |
+| GET    | `/documents/{document_id}/analysis`      | Analyze a CSV or XLSX document            |
+| GET    | `/documents/{document_id}/insights`      | Get or create cached spreadsheet insights |
+| GET    | `/documents/{document_id}/report`        | Download a generated PDF report           |
+| PATCH  | `/documents/{document_id}/favorite`      | Set favorite status                       |
+| PATCH  | `/documents/{document_id}/folder`        | Move into or out of a folder              |
+| POST   | `/documents/{document_id}/tags`          | Attach a tag                              |
+| DELETE | `/documents/{document_id}/tags/{tag_id}` | Remove a tag                              |
 
 Document-list query parameters:
 
-| Parameter | Default | Description |
-|---|---:|---|
-| `search` | — | Case-insensitive filename search |
-| `favorite` | — | Filter by favorite status |
-| `folder_id` | — | Filter by folder |
-| `tag_id` | — | Filter by tag |
-| `page` | 1 | Page number |
-| `per_page` | 10 | Results per page, from 1 to 100 |
+| Parameter   | Default | Description                      |
+| ----------- | ------: | -------------------------------- |
+| `search`    |       — | Case-insensitive filename search |
+| `favorite`  |       — | Filter by favorite status        |
+| `folder_id` |       — | Filter by folder                 |
+| `tag_id`    |       — | Filter by tag                    |
+| `page`      |       1 | Page number                      |
+| `per_page`  |      10 | Results per page, from 1 to 100  |
 
 ### Folders and tags
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/folders` | Create a folder |
-| GET | `/folders` | List folders |
-| PATCH | `/folders/{folder_id}` | Rename a folder |
+| Method | Endpoint               | Description     |
+| ------ | ---------------------- | --------------- |
+| POST   | `/folders`             | Create a folder |
+| GET    | `/folders`             | List folders    |
+| PATCH  | `/folders/{folder_id}` | Rename a folder |
 | DELETE | `/folders/{folder_id}` | Delete a folder |
-| POST | `/tags` | Create a tag |
-| GET | `/tags` | List tags |
+| POST   | `/tags`                | Create a tag    |
+| GET    | `/tags`                | List tags       |
 
 All endpoints in these sections are scoped to the authenticated user.
 
 ## Data model
 
-| Table | Purpose |
-|---|---|
-| `users` | Accounts and password hashes |
-| `documents` | File metadata, extracted content, summary, insights, and latest status |
-| `document_chunks` | Searchable text chunks, page numbers, and vector embeddings |
-| `document_questions` | Question history, answers, and citation JSON |
-| `document_status_events` | Durable, ordered processing transitions |
-| `folders` | User-owned folders |
-| `tags` | User-owned tags |
-| `document_tags` | Document-to-tag association |
+| Table                    | Purpose                                                                |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `users`                  | Accounts and password hashes                                           |
+| `documents`              | File metadata, extracted content, summary, insights, and latest status |
+| `document_chunks`        | Searchable text chunks, page numbers, and vector embeddings            |
+| `document_questions`     | Question history, answers, and citation JSON                           |
+| `document_status_events` | Durable, ordered processing transitions                                |
+| `folders`                | User-owned folders                                                     |
+| `tags`                   | User-owned tags                                                        |
+| `document_tags`          | Document-to-tag association                                            |
 
 Document deletion cascades to chunks, questions, tags associations, and status events. The uploaded file and generated report are also removed from local storage.
 
@@ -511,9 +509,9 @@ Use a strong JWT secret, HTTPS, managed secret storage, and production-safe data
 
 Run the test suite:
 
-~~~bash
+```bash
 python -m unittest discover -s tests -v
-~~~
+```
 
 The current suite covers:
 
@@ -545,6 +543,6 @@ This project does not currently include an explicit license file. Add one before
 
 ## Author
 
-Arsam — full-stack developer focused on modern web development, Python backend engineering, and AI-powered applications.
+Arsam — full-stack Engineer focused on modern web development, Python backend engineering, and AI-powered applications.
 
 GitHub: https://github.com/fatdarkness6
