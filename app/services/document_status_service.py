@@ -90,8 +90,10 @@ def record_document_status(
     if progress is not None and not 0 <= progress <= 100:
         raise ValueError("Document progress must be between 0 and 100")
 
-    if document.id is None:
-        db.flush()
+    # SessionLocal disables autoflush. Persist pending fields such as
+    # a new document ID, extracted_text, and summary before populate_existing
+    # refreshes the row. Otherwise the refresh would restore stale DB state.
+    db.flush()
 
     # Serialize state-version allocation for a document. This prevents two
     # processing workers (for example, an upload and a reprocess) from writing

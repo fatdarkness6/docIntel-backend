@@ -19,6 +19,7 @@ from app.services.document_status_service import (
     DocumentStatusRepository,
     DocumentStatusSnapshot,
     DocumentStatusStreamService,
+    record_document_status,
 )
 
 
@@ -229,6 +230,31 @@ class DocumentStatusRepositoryTests(unittest.TestCase):
         self.assertIsNone(
             repository.get_for_user(self.document_id, self.other_id)
         )
+
+    def test_terminal_status_does_not_discard_pending_document_content(self):
+        with self.session_factory() as db:
+            document = db.get(Document, self.document_id)
+            document.extracted_text = "Persisted extracted text"
+            document.summary = "Persisted AI summary"
+
+            event = record_document_status(
+                db,
+                document,
+                status="completed",
+                stage="completed",
+                progress=100,
+                message="Document processing completed",
+            )
+            # SQLite does not auto-increment a BIGINT primary key. PostgreSQL
+            # uses BIGSERIAL for this column in the production migration.
+            event.id = 1
+            db.commit()
+
+        with self.session_factory() as db:
+            document = db.get(Document, self.document_id)
+            self.assertEqual("Persisted extracted text", document.extracted_text)
+            self.assertEqual("Persisted AI summary", document.summary)
+            self.assertEqual("completed", document.status)
 
 
 class DocumentStatusRouteTests(unittest.TestCase):
