@@ -1,10 +1,11 @@
-from datetime import datetime
-from sqlalchemy import DateTime, ForeignKey, String, BigInteger, func , Boolean
-from sqlalchemy.orm import Mapped, mapped_column , relationship
-from app.models.document_tag import document_tags
-from sqlalchemy import Text
 from typing import TYPE_CHECKING
+
+from datetime import datetime
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.db.session import Base
+from app.models.document_tag import document_tags
 
 
 
@@ -59,6 +60,37 @@ class Document(Base):
     status: Mapped[str] = mapped_column(
         String(20),
         default="processing"
+    )
+
+    processing_stage: Mapped[str | None] = mapped_column(
+        String(40),
+        nullable=True,
+        default="queued",
+    )
+
+    processing_progress: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        default=0,
+    )
+
+    status_message: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        default="Document queued for processing",
+    )
+
+    status_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    status_event_id: Mapped[int] = mapped_column(
+        BigInteger,
+        default=0,
+        server_default="0",
+        nullable=False,
     )
     
     is_favorite: Mapped[bool] = mapped_column(

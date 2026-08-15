@@ -12,6 +12,11 @@ class DocumentResponse(BaseModel):
     created_at: datetime
     is_favorite: bool
     status: str
+    processing_stage: str | None = None
+    processing_progress: int | None = None
+    status_message: str | None = None
+    status_updated_at: datetime | None = None
+    status_event_id: int = 0
     summary: str | None
     folder_id: int | None
 

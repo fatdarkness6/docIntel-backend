@@ -6,16 +6,18 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
+    Header,
     HTTPException,
     Query,
+    Request,
     UploadFile,
     status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_stream_current_user_id
 from app.db.session import get_db
 
 from app.models.document import Document
@@ -52,6 +54,10 @@ from app.services.document_service import (
 )
 from app.services.embedding_service import create_embeddings
 from app.services.report_service import generate_document_report
+from app.services.document_status_service import (
+    document_status_stream,
+    record_document_status,
+)
 
 
 router = APIRouter()
@@ -156,6 +162,14 @@ def upload_document(
     )
 
     db.add(document)
+    record_document_status(
+        db,
+        document,
+        status="processing",
+        stage="queued",
+        progress=0,
+        message="Document queued for processing",
+    )
     db.commit()
     db.refresh(document)
 
@@ -171,6 +185,54 @@ def upload_document(
 # =========================================================
 # Documents
 # =========================================================
+
+
+@router.get(
+    "/{document_id}/events",
+    tags=["Documents"],
+    summary="Stream document processing status",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "Server-Sent Events stream",
+            "content": {"text/event-stream": {}},
+        },
+        401: {"description": "Missing or invalid access token"},
+        404: {"description": "Document not found"},
+    },
+)
+async def stream_document_events(
+    document_id: int,
+    request: Request,
+    last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
+    current_user_id: int = Depends(get_stream_current_user_id),
+):
+    initial = await document_status_stream.get_initial_snapshot(
+        document_id,
+        current_user_id,
+    )
+
+    if initial is None:
+        # Deliberately use the same response for a missing document and one
+        # owned by another user to avoid leaking document existence.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    return StreamingResponse(
+        document_status_stream.stream(
+            request,
+            initial,
+            last_event_id,
+        ),
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get(
@@ -476,8 +538,16 @@ def reprocess_document(
             detail="Original file was not found",
         )
 
-    document.status = "processing"
     document.summary = None
+
+    record_document_status(
+        db,
+        document,
+        status="processing",
+        stage="queued",
+        progress=0,
+        message="Document queued for reprocessing",
+    )
 
     db.commit()
 

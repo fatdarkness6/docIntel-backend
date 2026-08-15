@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
 from app.models.user import User
 
 
@@ -37,3 +37,29 @@ def get_current_user(
         )
 
     return user
+
+
+def get_stream_current_user_id(
+    token: str = Depends(oauth2_scheme),
+) -> int:
+    """Authenticate an SSE request without holding a DB session open."""
+    try:
+        user_id = decode_access_token(token)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    with SessionLocal() as db:
+        user_exists = db.execute(
+            select(User.id).where(User.id == user_id)
+        ).scalar_one_or_none()
+
+    if user_exists is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    return user_id

@@ -11,6 +11,7 @@ from app.db.session import SessionLocal
 from app.models.document import Document
 from app.services.ai_service import summarize_document
 from app.services.embedding_service import create_embeddings
+from app.services.document_status_service import record_document_status
 
 
 
@@ -99,6 +100,16 @@ def process_document(
 
         if not document:
             return
+
+        record_document_status(
+            db,
+            document,
+            status="processing",
+            stage="extracting",
+            progress=15,
+            message="Extracting document content",
+        )
+        db.commit()
         
         db.execute(
             delete(DocumentChunk).where(
@@ -116,6 +127,16 @@ def process_document(
                 page["text"]
                 for page in pages
             )
+
+            record_document_status(
+                db,
+                document,
+                status="processing",
+                stage="chunking",
+                progress=40,
+                message="Preparing document sections",
+            )
+            db.commit()
 
             chunk_data = []
 
@@ -137,6 +158,16 @@ def process_document(
                 document.file_type
             )
 
+            record_document_status(
+                db,
+                document,
+                status="processing",
+                stage="chunking",
+                progress=40,
+                message="Preparing document sections",
+            )
+            db.commit()
+
             chunks = split_text(
                 extracted_text
             )
@@ -154,6 +185,16 @@ def process_document(
             chunk["content"]
             for chunk in chunk_data
         ]
+
+        record_document_status(
+            db,
+            document,
+            status="processing",
+            stage="analyzing",
+            progress=60,
+            message="Analyzing document content",
+        )
+        db.commit()
 
         embeddings = create_embeddings(
             chunk_contents
@@ -179,24 +220,49 @@ def process_document(
         )
 
         # Generate document summary
+        record_document_status(
+            db,
+            document,
+            status="processing",
+            stage="generating_summary",
+            progress=85,
+            message="Generating document summary",
+        )
+        db.commit()
+
         summary = summarize_document(
             extracted_text
         )
 
         document.extracted_text = extracted_text
         document.summary = summary
-        document.status = "completed"
+        record_document_status(
+            db,
+            document,
+            status="completed",
+            stage="completed",
+            progress=100,
+            message="Document processing completed",
+        )
 
         db.commit()
 
     except Exception:
+        db.rollback()
         document = db.get(
             Document,
             document_id
         )
 
         if document:
-            document.status = "failed"
+            record_document_status(
+                db,
+                document,
+                status="failed",
+                stage="failed",
+                progress=None,
+                message="Document processing failed",
+            )
             db.commit()
 
         raise

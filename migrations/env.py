@@ -9,6 +9,7 @@ from app.models.folder import Folder
 from app.models.tag import Tag
 from app.models.document_tag import document_tags
 from app.models.document_chunk import DocumentChunk
+from app.models.document_status_event import DocumentStatusEvent
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
